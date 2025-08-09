@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>SQL Gra – Poziom 1</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/codemirror.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/mode/sql/sql.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2em; }
+    #editor { height: 100px; border: 1px solid #ccc; }
+    #result { margin-top: 1em; }
+
+    /* Ulepszone style dla tabeli wyników */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+
+    .results-table th, .results-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+
+    .results-table th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+
+    /* Style dla wiadomości o ładowaniu i błędzie */
+    #output {
+      font-family: monospace;
+      white-space: pre; /* Zachowaj formatowanie jak w pre */
+    }
+
+    .status-message {
+      font-style: italic;
+      color: #555;
+    }
+
+    .error-message {
+      color: crimson;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h2>Poziom 1: Znajdź gracza z największą liczbą XP</h2>
+
+  <form id="sql-form">
+    <textarea id="editor"></textarea><br>
+    <button type="submit" id="execute-button">Wykonaj zapytanie</button>
+  </form>
+
+  <div id="result"><strong>Wynik:</strong><pre id="output"></pre></div>
+
+  <script>
+    // === Ulepszony kod JavaScript ===
+
+    // Użycie stałej dla adresu URL API, ułatwia to ewentualną zmianę w przyszłości.
+    const API_URL = "https://sql-game-07ww.onrender.com/run-sql";
+
+    const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+      mode: 'text/x-sql',
+      lineNumbers: true,
+      theme: 'default',
+    });
+
+    const output = document.getElementById("output");
+    const sqlForm = document.getElementById('sql-form');
+    const executeButton = document.getElementById('execute-button');
+
+    sqlForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = editor.getValue();
+
+      // === Ulepszenie 1: Obsługa stanu ładowania ===
+      // Zablokuj przycisk i pokaż komunikat o ładowaniu,
+      // aby zapobiec wielokrotnemu wysyłaniu zapytań i dać feedback użytkownikowi.
+      executeButton.disabled = true;
+      output.innerHTML = `<span class="status-message">Ładowanie...</span>`;
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+
+        // === Ulepszenie 2: Bardziej szczegółowa obsługa błędów HTTP ===
+        // Sprawdź status odpowiedzi HTTP. Błąd serwera (np. 500)
+        // może nie zwrócić poprawnego JSON-a z polem 'error'.
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Błąd serwera: ${res.status} - ${errorText}`);
+        }
+
+        const data = await res.json();
+
+        output.innerHTML = ""; // Wyczyść poprzedni wynik
+
+        // === Ulepszenie 3: Ujednolicona obsługa błędów z serwera ===
+        // Po udanym pobraniu, sprawdź czy serwer zwrócił błąd w danych.
+        if (data.error) {
+          // Użyj klasy CSS dla lepszego formatowania błędu
+          output.innerHTML = `<span class="error-message">Błąd: ${data.error}</span>`;
+        } else {
+          // === Ulepszenie 4: Dodanie semantycznych tagów <thead> i <tbody> ===
+          // Zwiększa to dostępność i ułatwia stylowanie tabeli.
+          const table = document.createElement("table");
+          table.classList.add("results-table"); // Dodaj klasę CSS do tabeli
+          const thead = document.createElement("thead");
+          const tbody = document.createElement("tbody");
+
+          const headerRow = document.createElement("tr");
+          data.columns.forEach(col => {
+            const th = document.createElement("th");
+            th.textContent = col;
+            headerRow.appendChild(th);
+          });
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          data.rows.forEach(row => {
+            const tr = document.createElement("tr");
+            row.forEach(cell => {
+              const td = document.createElement("td");
+              td.textContent = cell;
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+
+          output.appendChild(table);
+        }
+
+      } catch (error) {
+        // Obsługa błędów sieciowych lub tych, które zostały rzucone w bloku try
+        output.innerHTML = `<span class="error-message">${error.message}</span>`;
+      } finally {
+        // === Ulepszenie 1 (ciąg dalszy): Zawsze odblokuj przycisk ===
+        // Blok 'finally' gwarantuje, że przycisk zostanie odblokowany
+        // niezależnie od tego, czy zapytanie się powiodło, czy nie.
+        executeButton.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>
